@@ -1,33 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import {
-  initialLists,
-  CURRENT_USER_ID,
-  allUsers,
-} from "../data/mockData";
+import { CURRENT_USER_ID, allUsers } from "../data/mockData";
 import MembersModal from "./MembersModal";
+import AddItemModal from "./AddItemModal";
 
-function ShoppingListDetail() {
+function ShoppingListDetail({ lists, setLists }) {
   const { listId } = useParams();
   const navigate = useNavigate();
 
-  const [list, setList] = useState(null);
-  const [newItemName, setNewItemName] = useState("");
   const [filter, setFilter] = useState("unresolved");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
+  const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
 
-  useEffect(() => {
-    const foundList = initialLists.find((l) => l.id === listId);
+  const list = lists.find((l) => l.id === listId);
 
-    if (foundList && foundList.members.includes(CURRENT_USER_ID)) {
-      setList(foundList);
-    } else {
-      setList(null);
-    }
-  }, [listId, navigate]);
+  const updateList = (updatedList) => {
+    setLists(lists.map((l) => (l.id === listId ? updatedList : l)));
+  };
 
-  const handleAddItem = (e) => {
-    e.preventDefault();
+  const handleAddItem = (newItemName) => {
     if (newItemName.trim() === "") return;
 
     const newItem = {
@@ -36,16 +27,14 @@ function ShoppingListDetail() {
       solved: false,
     };
 
-    setList({
+    updateList({
       ...list,
       items: [...list.items, newItem],
     });
-
-    setNewItemName("");
   };
 
   const handleMarkSolved = (itemId) => {
-    setList({
+    updateList({
       ...list,
       items: list.items.map((item) =>
         item.id === itemId ? { ...item, solved: true } : item
@@ -54,7 +43,7 @@ function ShoppingListDetail() {
   };
 
   const handleDeleteItem = (itemId) => {
-    setList({
+    updateList({
       ...list,
       items: list.items.filter((item) => item.id !== itemId),
     });
@@ -63,29 +52,24 @@ function ShoppingListDetail() {
   const handleChangeName = () => {
     const newName = prompt("Zadejte nový název seznamu:", list.name);
     if (newName && newName.trim() !== "") {
-      setList({ ...list, name: newName });
+      updateList({ ...list, name: newName });
     }
   };
 
   const handleRemoveMember = (memberId) => {
+    const updatedMembers = list.members.filter((id) => id !== memberId);
     if (memberId === CURRENT_USER_ID) {
       if (!window.confirm("Opravdu chcete opustit tento seznam?")) {
         return;
       }
-      setList({
-        ...list,
-        members: list.members.filter((id) => id !== memberId),
-      });
-      setIsModalOpen(false);
+      updateList({ ...list, members: updatedMembers });
+      setIsMembersModalOpen(false);
       navigate("/");
     } else {
       if (!window.confirm("Opravdu chcete odebrat tohoto člena?")) {
         return;
       }
-      setList({
-        ...list,
-        members: list.members.filter((id) => id !== memberId),
-      });
+      updateList({ ...list, members: updatedMembers });
     }
   };
 
@@ -106,13 +90,13 @@ function ShoppingListDetail() {
       return;
     }
 
-    setList({
+    updateList({
       ...list,
       members: [...list.members, userId],
     });
   };
 
-  if (!list) {
+  if (!list || !list.members.includes(CURRENT_USER_ID)) {
     return (
       <div className="content">
         Seznam nebyl nalezen nebo k němu nemáte přístup.
@@ -147,24 +131,19 @@ function ShoppingListDetail() {
         <button
           className="button-secondary"
           style={{ marginLeft: "auto" }}
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => setIsMembersModalOpen(true)}
         >
           Show members ({list.members.length})
         </button>
       </div>
 
       <div className="content">
-        <form className="add-item-form" onSubmit={handleAddItem}>
-          <input
-            type="text"
-            placeholder="Enter item name..."
-            value={newItemName}
-            onChange={(e) => setNewItemName(e.target.value)}
-          />
-          <button type="submit" className="button-primary">
-            + Add Item
-          </button>
-        </form>
+        <button
+          className="button-primary add-item-button"
+          onClick={() => setIsAddItemModalOpen(true)}
+        >
+          + Add New Item
+        </button>
 
         <div className="item-list-header">
           <h3>List of Items ({filteredItems.length})</h3>
@@ -212,15 +191,22 @@ function ShoppingListDetail() {
         </div>
       </div>
 
-      {isModalOpen && (
+      {isMembersModalOpen && (
         <MembersModal
           list={list}
           allUsers={allUsers}
           currentUser={CURRENT_USER_ID}
           isOwner={isOwner}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => setIsMembersModalOpen(false)}
           onRemoveMember={handleRemoveMember}
           onAddMember={handleAddMember}
+        />
+      )}
+
+      {isAddItemModalOpen && (
+        <AddItemModal
+          onClose={() => setIsAddItemModalOpen(false)}
+          onAddItem={handleAddItem}
         />
       )}
     </>

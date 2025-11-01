@@ -1,14 +1,9 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  initialLists,
-  CURRENT_USER_ID,
-  CURRENT_USER_NAME,
-} from "../data/mockData";
+import { CURRENT_USER_ID, CURRENT_USER_NAME } from "../data/mockData";
 import CreateListModal from "./CreateListModal";
 
-function ShoppingListPage() {
-  const [lists, setLists] = useState(initialLists);
+function ShoppingListPage({ lists, setLists }) {
   const [showArchived, setShowArchived] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 

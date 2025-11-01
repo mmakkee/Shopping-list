@@ -1,18 +1,23 @@
-import React from "react";
+import React, { useState } from "react";
 import { Routes, Route } from "react-router-dom";
 import ShoppingListPage from "./components/ShoppingListPage";
 import ShoppingListDetail from "./components/ShoppingListDetail";
+import { initialLists } from "./data/mockData";
 
 function App() {
+  const [lists, setLists] = useState(initialLists);
+
   return (
     <div className="app-container">
       <Routes>
-        {/* Hlavní cesta "/" zobrazí přehled seznamů */}
-        <Route path="/" element={<ShoppingListPage />} />
-
-        {/* Cesta "/list/:listId" zobrazí detail konkrétního seznamu */}
-        {/* :listId je dynamický parametr, který si pak přečteme */}
-        <Route path="/list/:listId" element={<ShoppingListDetail />} />
+        <Route
+          path="/"
+          element={<ShoppingListPage lists={lists} setLists={setLists} />}
+        />
+        <Route
+          path="/list/:listId"
+          element={<ShoppingListDetail lists={lists} setLists={setLists} />}
+        />
       </Routes>
     </div>
   );

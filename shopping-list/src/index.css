@@ -317,3 +317,9 @@ button,
   outline: none;
   border-color: #db7093;
 }
+.add-item-button {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  margin-bottom: 25px;
+}
