@@ -14,6 +14,7 @@ function App() {
           path="/"
           element={<ShoppingListPage lists={lists} setLists={setLists} />}
         />
+        
         <Route
           path="/list/:listId"
           element={<ShoppingListDetail lists={lists} setLists={setLists} />}
