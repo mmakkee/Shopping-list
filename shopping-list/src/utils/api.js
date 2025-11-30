@@ -1,4 +1,4 @@
-import { initialLists, CURRENT_USER_ID, allUsers } from "../data/mockData";
+import { initialLists, CURRENT_USER_ID } from "../data/mockData";
 
 const USE_MOCK_API = false;
 const BASE_URL = "http://localhost:3005";
@@ -54,7 +54,7 @@ export const api = {
       const newList = {
         id: `list-${Date.now()}`,
         name: name,
-        owner: CURRENT_USER_ID,
+        ownerId: CURRENT_USER_ID,
         members: [CURRENT_USER_ID],
         archived: false,
         items: [],
@@ -143,13 +143,16 @@ export const api = {
     });
   },
 
-  toggleArchiveList: async (listId) => {
-    return {};
+  toggleArchiveList: async (listId, currentStatus) => {
+    return await api._fetch("/list/updateArchived", {
+      method: "POST",
+      body: JSON.stringify({ id: listId, archived: !currentStatus }),
+    });
   },
 
   getAllUsers: async () => {
     return {
-      user123: { name: "Maria (Owner)" },
+      user123: { name: "Mariya (Owner)" },
       user789: { name: "Ivan (Member)" },
       user456: { name: "Petr (Stranger)" },
     };

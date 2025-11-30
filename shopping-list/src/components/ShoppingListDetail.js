@@ -17,7 +17,6 @@ function ShoppingListDetail() {
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
 
-  // Load detail
   const loadListDetail = useCallback(async () => {
     try {
       const data = await api.getListDetail(listId);
@@ -33,7 +32,6 @@ function ShoppingListDetail() {
     loadListDetail();
   }, [loadListDetail]);
 
-  // Handlers
   const handleAddItem = async (newItemName) => {
     if (newItemName.trim() === "") return;
     try {
@@ -47,7 +45,7 @@ function ShoppingListDetail() {
   const handleMarkSolved = async (itemId) => {
     setList(prev => ({
         ...prev,
-        items: prev.items.map(i => i.id === itemId ? {...i, solved: true} : i)
+        items: prev.items.map(i => (i.id === itemId || i._id === itemId) ? {...i, solved: true} : i)
     }));
     
     try {
@@ -58,11 +56,11 @@ function ShoppingListDetail() {
   };
 
   const handleDeleteItem = async (itemId) => {
-    if(!window.confirm("Delete item?")) return;
+    if(!window.confirm("Delete this item?")) return;
     
     setList(prev => ({
         ...prev,
-        items: prev.items.filter(i => i.id !== itemId)
+        items: prev.items.filter(i => (i.id !== itemId && i._id !== itemId))
     }));
 
     try {
@@ -82,11 +80,11 @@ function ShoppingListDetail() {
 
   const handleRemoveMember = async (memberId) => {
     if (memberId === CURRENT_USER_ID) {
-      if (!window.confirm("Leave list?")) return;
+      if (!window.confirm("Are you sure you want to leave this list?")) return;
       await api.manageMember(listId, memberId, 'remove');
       navigate("/");
     } else {
-      if (!window.confirm("Remove member?")) return;
+      if (!window.confirm("Remove this member?")) return;
       await api.manageMember(listId, memberId, 'remove');
       loadListDetail();
     }
@@ -113,12 +111,11 @@ function ShoppingListDetail() {
     loadListDetail();
   };
 
-  // Render logic
   if (loading) return <div className="loading-state">Loading...</div>;
   if (error) return <div className="error-state">Error: {error} <Link to="/">Back</Link></div>;
   if (!list) return null;
 
-  const isOwner = list.owner === CURRENT_USER_ID;
+  const isOwner = list.ownerId === CURRENT_USER_ID;
 
   const filteredItems = list.items.filter((item) => {
     if (filter === "unresolved") return !item.solved;
@@ -131,14 +128,14 @@ function ShoppingListDetail() {
         <Link to="/" className="button button-secondary">&larr; Back</Link>
         <h2>{list.name}</h2>
         {isOwner && (
-          <button className="button-secondary" onClick={handleChangeName}>Change</button>
+          <button className="button-secondary" onClick={handleChangeName}>Rename</button>
         )}
         <button
           className="button-secondary"
           style={{ marginLeft: "auto" }}
           onClick={() => setIsMembersModalOpen(true)}
         >
-          Show members ({list.members.length})
+          Members ({list.members.length})
         </button>
       </div>
 
@@ -147,43 +144,51 @@ function ShoppingListDetail() {
           className="button-primary add-item-button"
           onClick={() => setIsAddItemModalOpen(true)}
         >
-          + Add New Item
+          + Add Item
         </button>
 
         <div className="item-list-header">
-          <h3>List of Items ({filteredItems.length})</h3>
+          <h3>Items ({filteredItems.length})</h3>
           <div className="tabs">
             <button
               className={`tab-button ${filter === "unresolved" ? "active" : ""}`}
               onClick={() => setFilter("unresolved")}
             >
-              Unresolved only
+              Unresolved
             </button>
             <button
               className={`tab-button ${filter === "all" ? "active" : ""}`}
               onClick={() => setFilter("all")}
             >
-              Show all
+              All
             </button>
           </div>
         </div>
 
         <div className="item-list">
-          {filteredItems.map((item) => (
-            <div key={item.id} className={`item-row ${item.solved ? "solved" : ""}`}>
-              <span>{item.name}</span>
-              <div className="item-row-actions">
-                {!item.solved && (
-                  <button className="button-secondary" onClick={() => handleMarkSolved(item.id)}>
-                    ✓ Mark solved
+          {filteredItems.map((item) => {
+            const itemId = item.id || item._id;
+            return (
+              <div key={itemId} className={`item-row ${item.solved ? "solved" : ""}`}>
+                <span>{item.text || item.name}</span>
+                <div className="item-row-actions">
+                  {!item.solved && (
+                    <button className="button-secondary" onClick={() => handleMarkSolved(itemId)}>
+                      ✓ Done
+                    </button>
+                  )}
+                  <button className="button-danger" onClick={() => handleDeleteItem(itemId)}>
+                    Delete
                   </button>
-                )}
-                <button className="button-danger" onClick={() => handleDeleteItem(item.id)}>
-                  Delete
-                </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+          {filteredItems.length === 0 && (
+             <p style={{textAlign: "center", color: "#ccc", padding: "20px"}}>
+                 No items found.
+             </p>
+          )}
         </div>
       </div>
 

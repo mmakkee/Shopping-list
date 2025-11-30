@@ -63,7 +63,7 @@ function MembersModal({
             <form onSubmit={handleAddSubmit} className="add-member-form">
               <input
                 type="text"
-                placeholder="Enter member name (e.g., Sarah)"
+                placeholder="Enter member name"
                 value={newMemberName}
                 onChange={(e) => setNewMemberName(e.target.value)}
               />

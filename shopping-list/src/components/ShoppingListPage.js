@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { CURRENT_USER_ID, CURRENT_USER_NAME } from "../data/mockData";
+import { CURRENT_USER_ID, allUsers } from "../data/mockData";
 import CreateListModal from "./CreateListModal";
 import { api } from "../utils/api";
 
@@ -12,7 +12,6 @@ function ShoppingListPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Load data
   useEffect(() => {
     loadLists();
   }, []);
@@ -24,14 +23,13 @@ function ShoppingListPage() {
       setLists(data);
       setError(null);
     } catch (err) {
-      setError("Error loading lists.");
+      setError("Failed to load lists.");
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Handlers
   const handleCreateList = async (newListName) => {
     try {
       setLoading(true);
@@ -45,49 +43,53 @@ function ShoppingListPage() {
   };
 
   const handleDeleteList = async (listId) => {
-    if (window.confirm("Delete this list?")) {
+    if (window.confirm("Are you sure you want to delete this list?")) {
       try {
         await api.deleteList(listId);
-        setLists((prev) => prev.filter((l) => l.id !== listId));
+        setLists((prev) => prev.filter((l) => (l.id !== listId && l._id !== listId)));
+        await loadLists();
       } catch (err) {
         alert("Error deleting list.");
       }
     }
   };
 
-  const handleToggleArchive = async (listId) => {
+  const handleToggleArchive = async (list) => {
     try {
-      await api.toggleArchiveList(listId);
+      const listId = list.id || list._id;
+      await api.toggleArchiveList(listId, list.archived);
       loadLists();
     } catch (err) {
-      alert("Error changing archive state.");
+      alert("Error changing status.");
     }
   };
 
-  // Render logic
-  if (loading && lists.length === 0) return <div className="loading-state">Loading lists...</div>;
+  if (loading && lists.length === 0) return <div className="loading-state">Loading...</div>;
   if (error) return <div className="error-state">{error} <button onClick={loadLists}>Retry</button></div>;
 
   const visibleLists = lists.filter(
-    (list) =>
-      list.members.includes(CURRENT_USER_ID) &&
-      list.archived === showArchived
+    (list) => {
+      const members = list.members || [];
+      return members.includes(CURRENT_USER_ID) && list.archived === showArchived;
+    }
   );
 
-  const getOwnerName = (list) => {
-    return list.owner === CURRENT_USER_ID ? CURRENT_USER_NAME : "Sarah";
+  const getOwnerName = (ownerId) => {
+    if (ownerId === CURRENT_USER_ID) return "You";
+    if (allUsers[ownerId]) return allUsers[ownerId].name;
+    return "Unknown User";
   };
 
   return (
     <>
       <div className="header">
-        <h1>🛒 Shopping lists</h1>
+        <h1>🛒 Shopping Lists</h1>
         <button
           className="button-primary"
           onClick={() => setIsCreateModalOpen(true)}
           disabled={loading}
         >
-          + Create new list
+          + Create List
         </button>
       </div>
 
@@ -102,27 +104,28 @@ function ShoppingListPage() {
           className={`tab-button ${showArchived ? "active" : ""}`}
           onClick={() => setShowArchived(true)}
         >
-          Archive
+          Archived
         </button>
       </div>
 
       <div className="content">
         <div className="tile-grid">
           {visibleLists.map((list) => {
-            const isOwner = list.owner === CURRENT_USER_ID;
+            const listId = list.id || list._id;
+            const isOwner = list.ownerId === CURRENT_USER_ID;
             return (
-              <div key={list.id} className="list-tile">
+              <div key={listId} className="list-tile">
                 <div className="list-tile-content">
                   <Link
-                    to={`/list/${list.id}`}
+                    to={`/list/${listId}`}
                     style={{ textDecoration: "none" }}
                   >
                     <h3>{list.name}</h3>
                   </Link>
                   <p>
-                    owner: {getOwnerName(list)}
+                    Owner: {getOwnerName(list.ownerId)}
                     <br />
-                    members: {list.members.length}
+                    Members: {list.members ? list.members.length : 0}
                   </p>
                 </div>
                 <div className="list-tile-actions">
@@ -130,7 +133,7 @@ function ShoppingListPage() {
                     <button
                       className="button-icon"
                       title={list.archived ? "Restore" : "Archive"}
-                      onClick={() => handleToggleArchive(list.id)}
+                      onClick={() => handleToggleArchive(list)}
                     >
                       {list.archived ? "🔄" : "🗄️"}
                     </button>
@@ -139,7 +142,7 @@ function ShoppingListPage() {
                     <button
                       className="button-icon"
                       title="Delete"
-                      onClick={() => handleDeleteList(list.id)}
+                      onClick={() => handleDeleteList(listId)}
                     >
                       🗑️
                     </button>
@@ -149,6 +152,11 @@ function ShoppingListPage() {
             );
           })}
         </div>
+        {visibleLists.length === 0 && (
+             <p style={{textAlign: "center", color: "#ccc", padding: "20px"}}>
+                 No lists found.
+             </p>
+        )}
       </div>
 
       {isCreateModalOpen && (
