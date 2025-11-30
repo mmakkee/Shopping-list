@@ -1,80 +1,100 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { CURRENT_USER_ID, allUsers } from "../data/mockData";
 import MembersModal from "./MembersModal";
 import AddItemModal from "./AddItemModal";
+import { api } from "../utils/api";
 
-function ShoppingListDetail({ lists, setLists }) {
+function ShoppingListDetail() {
   const { listId } = useParams();
   const navigate = useNavigate();
+
+  const [list, setList] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [filter, setFilter] = useState("unresolved");
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
 
-  const list = lists.find((l) => l.id === listId);
+  // Load detail
+  const loadListDetail = useCallback(async () => {
+    try {
+      const data = await api.getListDetail(listId);
+      setList(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [listId]);
 
-  const updateList = (updatedList) => {
-    setLists(lists.map((l) => (l.id === listId ? updatedList : l)));
-  };
+  useEffect(() => {
+    loadListDetail();
+  }, [loadListDetail]);
 
-  const handleAddItem = (newItemName) => {
+  // Handlers
+  const handleAddItem = async (newItemName) => {
     if (newItemName.trim() === "") return;
-
-    const newItem = {
-      id: `item-${Date.now()}`,
-      name: newItemName,
-      solved: false,
-    };
-
-    updateList({
-      ...list,
-      items: [...list.items, newItem],
-    });
-  };
-
-  const handleMarkSolved = (itemId) => {
-    updateList({
-      ...list,
-      items: list.items.map((item) =>
-        item.id === itemId ? { ...item, solved: true } : item
-      ),
-    });
-  };
-
-  const handleDeleteItem = (itemId) => {
-    updateList({
-      ...list,
-      items: list.items.filter((item) => item.id !== itemId),
-    });
-  };
-
-  const handleChangeName = () => {
-    const newName = prompt("Zadejte nový název seznamu:", list.name);
-    if (newName && newName.trim() !== "") {
-      updateList({ ...list, name: newName });
+    try {
+      await api.addItem(listId, newItemName);
+      loadListDetail(); 
+    } catch (err) {
+      alert("Error adding item.");
     }
   };
 
-  const handleRemoveMember = (memberId) => {
-    const updatedMembers = list.members.filter((id) => id !== memberId);
+  const handleMarkSolved = async (itemId) => {
+    setList(prev => ({
+        ...prev,
+        items: prev.items.map(i => i.id === itemId ? {...i, solved: true} : i)
+    }));
+    
+    try {
+      await api.toggleItemSolved(listId, itemId);
+    } catch(err) {
+        loadListDetail();
+    }
+  };
+
+  const handleDeleteItem = async (itemId) => {
+    if(!window.confirm("Delete item?")) return;
+    
+    setList(prev => ({
+        ...prev,
+        items: prev.items.filter(i => i.id !== itemId)
+    }));
+
+    try {
+      await api.deleteItem(listId, itemId);
+    } catch (err) {
+        loadListDetail();
+    }
+  };
+
+  const handleChangeName = async () => {
+    const newName = prompt("Enter new list name:", list.name);
+    if (newName && newName.trim() !== "") {
+      setList(prev => ({ ...prev, name: newName }));
+      await api.updateListName(listId, newName);
+    }
+  };
+
+  const handleRemoveMember = async (memberId) => {
     if (memberId === CURRENT_USER_ID) {
-      if (!window.confirm("Opravdu chcete opustit tento seznam?")) {
-        return;
-      }
-      updateList({ ...list, members: updatedMembers });
-      setIsMembersModalOpen(false);
+      if (!window.confirm("Leave list?")) return;
+      await api.manageMember(listId, memberId, 'remove');
       navigate("/");
     } else {
-      if (!window.confirm("Opravdu chcete odebrat tohoto člena?")) {
-        return;
-      }
-      updateList({ ...list, members: updatedMembers });
+      if (!window.confirm("Remove member?")) return;
+      await api.manageMember(listId, memberId, 'remove');
+      loadListDetail();
     }
   };
 
-  const handleAddMember = (memberName) => {
-    const userEntry = Object.entries(allUsers).find(
+  const handleAddMember = async (memberName) => {
+    const users = await api.getAllUsers();
+    const userEntry = Object.entries(users).find(
       ([id, user]) => user.name.toLowerCase() === memberName.toLowerCase()
     );
 
@@ -82,51 +102,36 @@ function ShoppingListDetail({ lists, setLists }) {
       alert("User not found.");
       return;
     }
-
     const userId = userEntry[0];
 
     if (list.members.includes(userId)) {
-      alert("User is already a member of this list.");
+      alert("User is already a member.");
       return;
     }
 
-    updateList({
-      ...list,
-      members: [...list.members, userId],
-    });
+    await api.manageMember(listId, userId, 'add');
+    loadListDetail();
   };
 
-  if (!list || !list.members.includes(CURRENT_USER_ID)) {
-    return (
-      <div className="content">
-        Seznam nebyl nalezen nebo k němu nemáte přístup.
-      </div>
-    );
-  }
+  // Render logic
+  if (loading) return <div className="loading-state">Loading...</div>;
+  if (error) return <div className="error-state">Error: {error} <Link to="/">Back</Link></div>;
+  if (!list) return null;
 
   const isOwner = list.owner === CURRENT_USER_ID;
 
   const filteredItems = list.items.filter((item) => {
-    if (filter === "unresolved") {
-      return !item.solved;
-    }
+    if (filter === "unresolved") return !item.solved;
     return true;
   });
 
   return (
     <>
-      <div
-        className="header"
-        style={{ justifyContent: "flex-start", gap: "20px" }}
-      >
-        <Link to="/" className="button button-secondary">
-          &larr; Back
-        </Link>
+      <div className="header" style={{ justifyContent: "flex-start", gap: "20px" }}>
+        <Link to="/" className="button button-secondary">&larr; Back</Link>
         <h2>{list.name}</h2>
         {isOwner && (
-          <button className="button-secondary" onClick={handleChangeName}>
-            Change
-          </button>
+          <button className="button-secondary" onClick={handleChangeName}>Change</button>
         )}
         <button
           className="button-secondary"
@@ -165,24 +170,15 @@ function ShoppingListDetail({ lists, setLists }) {
 
         <div className="item-list">
           {filteredItems.map((item) => (
-            <div
-              key={item.id}
-              className={`item-row ${item.solved ? "solved" : ""}`}
-            >
+            <div key={item.id} className={`item-row ${item.solved ? "solved" : ""}`}>
               <span>{item.name}</span>
               <div className="item-row-actions">
                 {!item.solved && (
-                  <button
-                    className="button-secondary"
-                    onClick={() => handleMarkSolved(item.id)}
-                  >
+                  <button className="button-secondary" onClick={() => handleMarkSolved(item.id)}>
                     ✓ Mark solved
                   </button>
                 )}
-                <button
-                  className="button-danger"
-                  onClick={() => handleDeleteItem(item.id)}
-                >
+                <button className="button-danger" onClick={() => handleDeleteItem(item.id)}>
                   Delete
                 </button>
               </div>
